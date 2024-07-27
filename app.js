@@ -1,12 +1,14 @@
 const express = require('express');
 const http = require('http');
-const path = require('path'); // Import path module
+const path = require('path');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const userRoutes = require('./routes/userRoutes');
 const User = require('./models/user');
-const multer = require('multer'); // Import multer for file uploads
+const multer = require('multer');
+const fs = require('fs');
+const authenticateToken = require('./authMiddleware'); // Ensure you have the correct path to your middleware
 require('dotenv').config();
 
 const app = express();
@@ -25,13 +27,22 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Ensure 'uploads/' directory exists and is writable
+const uploadDirectory = 'uploads/';
+if (!fs.existsSync(uploadDirectory)) {
+  fs.mkdirSync(uploadDirectory, { recursive: true });
+}
+
 // Configure multer storage for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Directory to save uploaded files
+    cb(null, uploadDirectory); // Directory to save uploaded files
   },
   filename: async (req, file, cb) => {
     try {
+      if (!req.user || !req.user.id) {
+        return cb(new Error('User ID not found in request'), null);
+      }
       const userId = req.user.id; // Extracted from token
       const user = await User.findById(userId); // Fetch user to get the username and score
       if (user) {
@@ -42,6 +53,7 @@ const storage = multer.diskStorage({
         cb(new Error('User not found'), null);
       }
     } catch (err) {
+      console.error('Error generating filename:', err);
       cb(err, null);
     }
   }
@@ -50,7 +62,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Define the route for uploading photos
-app.post('/api/upload-photo', upload.single('photo'), (req, res) => {
+app.post('/api/upload-photo', authenticateToken, upload.single('photo'), (req, res) => {
   if (req.file) {
     res.status(200).json({ message: 'File uploaded successfully' });
   } else {
