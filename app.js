@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ['https://beer-tracker-backend.onrender.com'], // Allow both localhost and your IP
+    origin: ['*'], // Allow both localhost and your IP
     methods: ['GET', 'POST'],
   },
 });
