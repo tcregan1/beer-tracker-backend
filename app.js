@@ -6,6 +6,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const userRoutes = require('./routes/userRoutes');
 const User = require('./models/user');
+const multer = require('multer'); // Import multer for file uploads
 require('dotenv').config();
 
 const app = express();
@@ -23,6 +24,39 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Configure multer storage for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Directory to save uploaded files
+  },
+  filename: async (req, file, cb) => {
+    try {
+      const userId = req.user.id; // Extracted from token
+      const user = await User.findById(userId); // Fetch user to get the username and score
+      if (user) {
+        // Create filename based on username and score
+        const filename = `${user.username}${user.score}${path.extname(file.originalname)}`;
+        cb(null, filename); // Set the filename
+      } else {
+        cb(new Error('User not found'), null);
+      }
+    } catch (err) {
+      cb(err, null);
+    }
+  }
+});
+
+const upload = multer({ storage });
+
+// Define the route for uploading photos
+app.post('/api/upload-photo', upload.single('photo'), (req, res) => {
+  if (req.file) {
+    res.status(200).json({ message: 'File uploaded successfully' });
+  } else {
+    res.status(400).json({ message: 'No file uploaded' });
+  }
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
